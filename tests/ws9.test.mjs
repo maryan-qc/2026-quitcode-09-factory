@@ -131,6 +131,35 @@ test('[P1.2] with --target, pass-to-pass comes from implemented criteria that Vi
   assert.deepEqual(task.protected, ['tests/**', 'package.json'], 'globs that match no file are dropped and reported');
 });
 
+test('[P1.2] therapy-scheduling: the PM issue snapshot (lines format) gives one requirement per AC, IDs and «Дано … Тоді» verbatim', () => {
+  const file = path.join(here, 'fixtures', 'ws9', 'therapy-scheduling-33.md');
+  const acs = [...fs.readFileSync(file, 'utf8').matchAll(/^- (AC-INS-\d{2}): (.+)$/gm)].map((m) => ({ id: m[1], text: m[2].trim() }));
+  assert.equal(acs.length, 6, 'the PM wrote six criteria');
+  const res = importer(['--file', file, '--ac', acs.map((a) => a.id).join(','), '--id', 'ins', '--holdout', 'ins']);
+  assert.equal(res.status, 0, res.stderr);
+  const task = JSON.parse(res.stdout);
+  assert.equal(task.title, 'Планувальник позначає статус перевірки страхування клієнта', '«Вимога:» prefix dropped');
+  assert.deepEqual(task.requirements.map((r) => r.id), acs.map((a) => a.id), 'as many requirements as criteria, same IDs');
+  assert.deepEqual(task.requirements.map((r) => r.description), acs.map((a) => a.text), 'descriptions are the PM text');
+  assert.ok(task.requirements.every((r, i) => r.verifiedBy.join() === `visible:${acs[i].id},holdout:ins`));
+});
+
+test('[P1.2] therapy-scheduling: example rows inside an HTML comment of the matrix are not pass-to-pass', () => {
+  const target = gitRepo(path.join(tmp(), 'target'), {
+    'docs/conformance.md': ['<!--', 'Приклад рядків (усередині коментаря — скрипт їх не читає):',
+      '| AC-LEAVE-02 | приклад шаблону | `src/x.ts` | `tests/leave.test.ts` | реалізовано |', '-->', '',
+      '| AC | Що перевіряє | Код | Тест | Статус |', '|---|---|---|---|---|',
+      '| AC-CARD-01 | картка дорослого | `src/a.ts` | `tests/card.test.ts` | реалізовано |', ''].join('\n'),
+    'tests/card.test.ts': 'it("AC-CARD-01: adult card", () => {});\n',
+    'tests/leave.test.ts': 'it("AC-LEAVE-02: template example", () => {});\n',
+    'package.json': '{}\n',
+  });
+  const file = path.join(here, 'fixtures', 'ws9', 'therapy-scheduling-33.md');
+  const res = importer(['--file', file, '--ac', 'AC-INS-03,AC-INS-05', '--id', 'ins-db', '--target', target]);
+  assert.equal(res.status, 0, res.stderr);
+  assert.deepEqual(JSON.parse(res.stdout).visibleTests.passToPass, ['AC-CARD-01']);
+});
+
 // --- doctor: readiness that means something ------------------------------------------------------------------------
 test('[P7.3] doctor is not ready when the test command reports no tests, or dependencies or the agent are missing', async () => {
   const { setupExample } = await import('../scripts/example.mjs');

@@ -111,10 +111,12 @@ function vitestAcs(target) {
 
 // ТОЧКА РОЗШИРЕННЯ 5 — що вже реалізовано (pass-to-pass: ці критерії мають лишитися зеленими).
 // Типово: рядки таблиці docs/conformance.md, де друга клітинка — ID, а передостання — «реалізовано».
+// therapy-scheduling: шаблон матриці курсу тримає «Приклад рядків» (AC-LEAVE-…, «реалізовано») у коментарі HTML —
+// як і в тексті вимог, коментар не рахуємо, інакше приклад шаблону став би pass-to-pass.
 function implementedAcs(target) {
   const matrix = path.join(target, "docs", "conformance.md");
   if (!fs.existsSync(matrix)) return [];
-  return fs.readFileSync(matrix, "utf8").split("\n")
+  return fs.readFileSync(matrix, "utf8").replace(/<!--[\s\S]*?-->/g, "").split("\n")
     .map((l) => l.split("|").map((c) => c.trim()))
     .filter((c) => new RegExp(`^${AC_ID}$`).test(c[1] ?? "") && /^реалізовано$/i.test(c.at(-2) ?? ""))
     .map((c) => c[1]);
